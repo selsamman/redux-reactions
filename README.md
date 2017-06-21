@@ -1,4 +1,4 @@
-# redux-reactions
+# redux-redactions
 ## Reactions simplifies actions and reducers:
 * Actions and reducers defined right next to each other.
 * No need for action type strings to bind actions and reducers
@@ -10,7 +10,7 @@
 
 Add reactions to your project
 ```
-npm install --save redux-reactions
+npm install --save redux-redactions
 ```
 
 Define your Reactions.  Reactions are a combination of reducers and actions:
