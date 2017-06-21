@@ -1,7 +1,7 @@
 {
   "name": "redux-reactions",
   "version": "0.0.1",
-  "private": true,
+  "private": false,
   "scripts": {
     "start": "react-native start",
     "setup_project": "npm run step1; npm run step2",
