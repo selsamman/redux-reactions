@@ -13,12 +13,14 @@ var initialState = {
     domain: {
         currentListIndex: 0,
         lists: [{
-            todoList: [
-            ],
+            todoList: [],
             nextId: 0
-        }]},
+        }]
+    },
     app: {
-        lists: [{filter: 'SHOW_ALL'}]
+        lists: [{
+            filter: 'SHOW_ALL'
+        }]
     }
 };
 

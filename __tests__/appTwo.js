@@ -12,13 +12,11 @@ import {todoList} from './app.js';
 var initialState = {
     domain: {
         list1: {
-            todoList: [
-            ],
+            todoList: [],
             nextId: 0
         },
         list2: {
-            todoList: [
-            ],
+            todoList: [],
             nextId: 0
         }
     },
