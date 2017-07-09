@@ -20,7 +20,7 @@
     "babel-preset-es2015": "*"
   },
   "scripts": {
-    "test": "jest",
+    "test": "./node_modules/jest/bin/jest.js --runInBand",
     "test:watch": "npm test -- --watch"
   },
   "repository": {

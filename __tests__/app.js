@@ -4,7 +4,7 @@ import { createStore, applyMiddleware} from 'redux';
 import { Provider } from 'react-redux';
 import thunk from 'redux-thunk';
 
-var todoList = {
+export var todoList = {
     AddItem: {
         action:
             (text) => ({text: text}),
@@ -13,7 +13,9 @@ var todoList = {
             set:    (action, state, nextId) => nextId + 1
         },{
             slice: ['domain', 'todoList'],
-            append:    (action, state) => ({text: action.text, id: state.domain.nextId, completed: false})
+            append:    (action, state, toDoList, domain) => {
+                return {text: action.text, id: state.domain.nextId, completed: false}
+        }
         },{
             slice: ['app', 'filter'],
             set:    (action, state, filter) => filter.filter === 'SHOW_ACTIVE' ? filter.filter : 'SHOW_ALL'
@@ -40,46 +42,12 @@ var todoList = {
             set:    (action, state, filter) => action.filter
         }]}
 };
-/*
-    slice: ['domain', 'tickets', currentTicket, 'activity', currentActivity, update]
-    slice: ['domain', 'tickets', currentTicket, 'history', allActivity, age]
-    slice: ['domain', 'tickets', previousTicket, 'modified']
 
-    domain: {
-        children: {
-            tickets: {
-                children: {
-                    'function currentTicket': {
-                        children: {
-                            activity: {
-                                children: {
-                                    'function currentActivity': {
-                                        reducers: [Function]
-                                    }
-                                }
-                            },
-                            history: {
-                                children: {
-                                    'function allActivity': {
-                                        reducers: [Function]
-                                    }
-                                }
-                            }
-                    },
-                    'function previousTicket': {
-                         children: {
-                            'modified: {
-                                reducers: [Function]
-                             }
-                         }
-                    }
-
-
-*/
-
-Reactions.addReactions(todoList);
-
-describe('Basic Low Level Sanity', () => {
+describe('Single Todo List', () => {
+    beforeAll(() => {
+        Reactions.clear(); // To keep tests separate
+        Reactions.addReactions(todoList);
+    });
     it('ruducerTree correct', () => {
         var map = Reactions.reducerTree
         expect(typeof map.AddItem).toEqual('object')

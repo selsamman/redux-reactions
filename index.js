@@ -1,14 +1,23 @@
-export var Reactions = {
+var ReactionsTemplate = {
     actions: {},
+    actionsGroup: {},
+    actionsStateMap: {},
     reducerTree: {},
     addReactions: addReactions,
     reduce: topLevelReducer,
-    stateChanges: stateChanges
-};
+    stateChanges: stateChanges,
+    clear: clear
+}
 
-function addReactions (newReactions) {
+export var Reactions = Object.assign({}, ReactionsTemplate);
+
+function clear () {
+    return Object.assign(Reactions, ReactionsTemplate);
+}
+
+function addReactions (newReactions, substitutions, group) {
     for (var reactionName in newReactions)
-        prepareReaction(newReactions[reactionName], reactionName);
+        prepareReaction(newReactions[reactionName], reactionName, substitutions, group);
 }
 
 // This reducer will wall through all the states while simaltaniously traversing a tree of reaction declarations
@@ -83,11 +92,11 @@ function topLevelReducer(rootState, action) {
     // Execute the reducer function
     function execute(reducer, newState) {
         if (reducer.set) {
-            return reducer.set.call(null, action, rootState, newState);
+            return reducer.set.call(null, action, mapState(rootState), newState);
         } else if (reducer.append) {
-            return newState.concat(reducer.append.call(null, action, rootState, newState));
+            return newState.concat(reducer.append.call(null, action, mapState(rootState), newState));
         } else if (reducer.assign) {
-            return Object.assign({}, newState, reducer.assign.call(null, action, rootState, newState));
+            return Object.assign({}, newState, reducer.assign.call(null, action, mapState(rootState), newState));
         } else if (reducer.delete) {
             return undefined;
         } else {
@@ -97,10 +106,46 @@ function topLevelReducer(rootState, action) {
     // Find the value of a slice key in the format of [action|state.prop1.prop2 etc]
     function evaluate (reactionNodeKey, reactionNodeValue, element, propOrIndex) {
         if (typeof reactionNodeValue.evaluate == "function")
-            return reactionNodeValue.evaluate.call(null, action, rootState, element);
+            return reactionNodeValue.evaluate.call(null, action, reactionNodeValue.evaluate.noMap ? rootState : mapState(rootState), element, propOrIndex);
         else
             return reactionNodeKey === propOrIndex;
     }
+    /**
+     * Substitute state map into top level state
+     * @param topLevelState
+     * @param stateMap
+     * @param action
+     */
+    function mapState(rootState) {
+        var stateMap = Reactions.actionsStateMap[action.type];
+        if (stateMap) {
+            var newState = Object.assign({}, rootState);
+            for (var stateProp in stateMap)
+                if (newState[stateProp])
+                    newState[stateProp] = evaluateState(stateMap[stateProp])
+            return newState;
+        } else
+            return rootState;
+
+        function evaluateState(stateSlices) {
+            var stateSlice = rootState
+            stateSlices.map((sliceComponent) => {
+                if (typeof sliceComponent == 'function') {
+                    if (stateSlice instanceof Array)
+                        stateSlice = stateSlice.find((item, index) => sliceComponent.call(null, action, rootState, item, index));
+                    else {
+                        var stateSliceProps = Object.getOwnPropertyNames(stateSlice);
+                        var stateSliceProp = stateSliceProps.find((prop)=> sliceComponent.call(null, action, rootState, stateSlice[prop]))
+                        stateSlice = stateSlice[stateSliceProp];
+                    }
+                } else {
+                    stateSlice = stateSlice[sliceComponent];
+                }
+            });
+            return stateSlice;
+        }
+    }
+
 };
 
 /**
@@ -129,16 +174,26 @@ function topLevelReducer(rootState, action) {
              }
  }
 */
-function prepareReaction(reaction, reactionName) {
+function prepareReaction(reaction, reactionName, substitutions, group) {
+
+    var originalreactionName = reactionName;
+    reactionName = (group ? (group + '.') : '')  + reactionName;
 
     if (!reaction.action)
         throw new Error("redux-reactions: Missing actions property in " + reactionName);
 
-    Reactions.actions[reactionName] = function () {
+    var actionFunction = function () {
         var action = reaction.action.apply(null, arguments);
         action.type = reactionName;
         return action;
     };
+    if (group) {
+        Reactions.actionsGroup[group] =  Reactions.actionsGroup[group] || {};
+        Reactions.actionsGroup[group][originalreactionName] = actionFunction;
+    }
+
+    Reactions.actions[reactionName] = actionFunction;
+    Reactions.actionsStateMap[reactionName] = substitutions;
 
     if (!reaction.state)
         throw new Error("redux-reactions: Missing state property in " + reactionName);
@@ -147,8 +202,9 @@ function prepareReaction(reaction, reactionName) {
     reaction.state.map(function (sliceReducer, sliceKey)  {
 
         var reactionNode = Reactions.reducerTree[reactionName] = Reactions.reducerTree[reactionName] || {reducers: []};
+        var reactionSlice = substitute(sliceReducer.slice, substitutions);
 
-        sliceReducer.slice.map(function processStateNode(stateNode) {
+        reactionSlice.map(function processStateNode(stateNode) {
             var stateNodeKey = typeof stateNode == 'function' ? stateNode.toString() : stateNode;
             reactionNode.children = reactionNode.children || {};
             reactionNode.children[stateNodeKey] = reactionNode.children[stateNodeKey] || {reducers: []}
@@ -159,7 +215,21 @@ function prepareReaction(reaction, reactionName) {
 
         reactionNode.reducers.push(sliceReducer);
     });
+
+    function substitute(reactionState, substitutions) {
+        if (substitutions && substitutions[reactionState[0]]) {
+            var substitution = substitutions[reactionState[0]];
+            substitution.map((subElement) => {
+                if (typeof subElement == 'function')
+                    subElement.noMap = true;
+            });
+            return substitution.slice().concat(reactionState.slice(1));
+        } else
+            return reactionState;
+    }
 }
+
+
 function stateChanges (oldState, newState) {
 
     var accumulator = {nodes: [], level: 0, oldState: oldState, newState: newState};
