@@ -55,7 +55,7 @@ var todoList = {
         }]}
 };
 ```
-Add your reaction definitons as reactions:
+Add your reaction definitions as reactions:
 ```
 import {Reactions} from 'redux-redactions';
 Reactions.addReactions(todoList);
@@ -77,7 +77,7 @@ Dispatch them:
 ```
 store.dispatch(Reactions.actions.AddItem("First Item"));
 ```
-You can easily write tests your reactions and ensure that not only do they do what you want them to do but that they don't mutate other parts of the state.  The stateChanges member function returns a string which describes which state slices have changed: 
+You can easily write tests for your reactions and ensure that not only do they do what you want them to do but that they don't mutate other parts of the state.  The stateChanges member function returns a string which describes which state slices have changed: 
 ```
         let oldState = state;
         store.dispatch(Reactions.actions.AddItem("First Item"));
@@ -89,9 +89,7 @@ You can easily write tests your reactions and ensure that not only do they do wh
         expect(Reactions.stateChanges(state, oldState)).toEqual('domain;domain.todoList;domain.nextId;app;');
 
 ```
-
-##Anatomy of a Reaction
-
+## Anatomy of a Reaction
 A reaction is a definition of both an action and a reducer handler.  Each reaction is defined as a property where the property name is the reaction type.  
 ```
 var todoList = {
@@ -129,7 +127,7 @@ The assign, set and append state handlers have these arguments:
 
 > Important: The state slice property must exist in the state for the state handler to get executed.  It is assumed that you will initialize your state with null or undefined values if there is no reason to have an actual value for a given property.
 
-##State Composition
+## State Composition
 
 Although your reactions may be written to be aware of the entire state graph you might actually want to have them be independent of where they fit into the state of a large application.  For example you might have multiple todoLists and select a  'current one' or you might have several todoLists active at the same time.  In all cases your reactions need not know anything other than what they need to manage a single todoList just as you would expect your todoList component to only know about the todoList it was dealing with.
  
@@ -211,10 +209,11 @@ This makes it easy to connect up a component that deals with one list or the oth
 var todoList1 = connect(
     state => ({domain: {todoList: state.app.list1}, app: {todoList: state.app.list1),
     dispatch => ({actions: bindActionCreators(Reactions.actionGroup.list1)
-);
+)(TodoList);
+
 var todoList2 = connect(
-   state => ({domain: {todoList: state.app.list2}, app: {todoList: state.app.list2),
-    dispatch => ({actions: bindActionCreators(Reactions.actionGroup.list1)
-);
+   state => ({domain: {todoList: state.app.list2}, app: {todoList: state.app.list2)),
+    dispatch => ({actions: bindActionCreators(Reactions.actionGroup.list1})
+)(TodoList);
 ````
 In effect what we have created is a structure for reducers and actions that is parallel to the mechanism you would normally use in connecting a component to state -- that is setting the state props to reflect just the part of the state relevant to the component instance.
