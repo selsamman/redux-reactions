@@ -34,8 +34,10 @@ var lists = {
         }]}
 }
 var stateMap = {
-    app: ['app', 'lists', (action, state, list, index) => index == state.domain.currentListIndex],
-    domain: ['domain', 'lists', (action, state, list, index) => index == state.domain.currentListIndex]
+    app: ['app', 'lists', (state, list, index) => index == state.domain.currentListIndex],
+    domain: ['domain', 'lists', (state, list, index) => {
+        return index == state.domain.currentListIndex
+    }]
 }
 
 

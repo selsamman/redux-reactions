@@ -1,11 +1,13 @@
 # redux-redactions
-## Reactions simplifies actions and reducers:
-* Actions and their associated reducers defined right next to each other.
-* No need for action type strings to bind actions and reducers
-* No need to worry about not mutating the state
-* No need to wire together a reducer hierarchy for your state tree.
-* In fact no need to write reducer functions at all
-* The master reducer traverses the state tree calling your action function to get a value to merge in.
+## Simplify Redux
+React and Redux make a powerful way to organize your state.  In their vanilla form you create actions which are dispatched by your components and then handled by reducer functions which ultimately render a new state with only the relevant state properties mutated.  This means you have to write:
+* Actions
+* Reducers
+* Action types constants to bind the actions and reducers
+* Higher level reducers that call down to your more specific reducers to ensure only the relevant state properties are mutated
+
+Redactions simplifies the organization by combining an action an function that modifies a specific slice of the state.  Because you declare the specific slice of the state to be modified, Redactions handles the higher level reduction and calls your function to get a new state property value. It also has declarative ways to merge in new properties, append to arrays or delete array elements such that you never have to worry about mutation.
+
 ## Usage
 
 Add reactions to your project
@@ -18,7 +20,7 @@ npm install --save redux-redactions
 
 Define your Reactions.  Reactions are a combination of reducers and actions:
 ```
-var todoList = {
+let todoList = {
     AddItem: {
         action:
             (text) => ({text: text}),
@@ -63,7 +65,7 @@ Reactions.addReactions(todoList);
 Connect them to redux:
 ```
 const createStoreWithMiddleware = applyMiddleware(thunk)(createStore);
-var state = {
+let state = {
     domain: {
         todoList: [
         ],
@@ -92,7 +94,7 @@ You can easily write tests for your reactions and ensure that not only do they d
 ## Anatomy of a Reaction
 A reaction is a definition of both an action and a reducer handler.  Each reaction is defined as a property where the property name is the reaction type.  
 ```
-var todoList = {
+let todoList = {
     AddItem: {
 ```
 The property contains further properties that
@@ -133,7 +135,7 @@ Although your reactions may be written to be aware of the entire state graph you
  
 Let's say you wanted to have multiple todoLists with one active at a time. Your state might look like this:
 ```
-var initialState = {
+let initialState = {
     domain: {
         currentListIndex: 0,
         lists: [{
@@ -151,9 +153,9 @@ var initialState = {
  This example uses the convention of dividing state into domain which reflects the data itself for a todoList and app which represents the workings of the application that manages the todoList.  We need to 'map' the set of actions to one particular instance of the lists array within domain and app.  This is done with a state map:
  
  ```
-var stateMap = {
-    app: ['app', 'lists', (action, state, list, index) => index == state.currentListIndex],
-    domain: ['domain', 'lists', (action, state, list, index) => index == state.currentListIndex]
+let stateMap = {
+    app: ['app', 'lists', (state, list, index) => index == state.currentListIndex],
+    domain: ['domain', 'lists', (state, list, index) => index == state.currentListIndex]
 }
  ```
 You add the reactions along with the state map:
@@ -166,7 +168,7 @@ This does two things:
  
 This is great if you want to have multiple todoLists and you want to simply set the current one but what if you actually have multiple active todoLists on your page.  In that case your state might look like this:
  ```
-var initialState = {
+let initialState = {
     domain: {
         list1: {
             todoList: [],
@@ -185,11 +187,11 @@ var initialState = {
 ```
 Now you need two state maps ot map app and domain to the correct part of the overall state:
  ```
- var stateMap1 = {
+ let stateMap1 = {
      app: ['app', 'list2'],
      domain: ['domain', 'list1']
  }
-var stateMap1 = {
+let stateMap2 = {
     app: ['app', 'list2'],
     domain: ['domain', 'list2']
 }
@@ -206,14 +208,38 @@ This will result in two sets of actions each of which has a different state map.
 ````
 This makes it easy to connect up a component that deals with one list or the other:
 ```
-var todoList1 = connect(
-    state => ({domain: {todoList: state.app.list1}, app: {todoList: state.app.list1),
+let todoList1 = connect(
+    state => ({domain: {todoList: state.domain.list1}, app: {todoList: state.app.list1),
     dispatch => ({actions: bindActionCreators(Reactions.actionGroup.list1)
 )(TodoList);
 
-var todoList2 = connect(
-   state => ({domain: {todoList: state.app.list2}, app: {todoList: state.app.list2)),
+let todoList2 = connect(
+   state => ({domain: {todoList: state.domain.list2}, app: {todoList: state.app.list2)),
     dispatch => ({actions: bindActionCreators(Reactions.actionGroup.list1})
 )(TodoList);
 ````
 In effect what we have created is a structure for reducers and actions that is parallel to the mechanism you would normally use in connecting a component to state -- that is setting the state props to reflect just the part of the state relevant to the component instance.
+
+## Automatically Connecting to a React Component
+
+Reactions.connect is a wrapper around connect that maps reaction groups to a component.  It is used in place of the redux connect. 
+```
+let todoList1 = Reactions.connect('list1')(TodoList);
+```
+It will map the state properties from 'list1' to your properties (domain and app in this case) and will map all of the actions in actionGroup.list1 as bound actions to your properties.
+
+You can also manually specify the mapStateToProps function and map them yourself.   The state you recieve in the state parameter will have already been mapped for you using the stateMap so that in this cas you map directly to state.domain rather than state.domain.list1
+```
+let todoList1 = Reactions.connect('list1', 
+    (state, props) => ({domain: state.domain, app: state.app}))(Test);
+```
+You also manually specify the mapActionToProps function and map the actions your self.  You will recieve an additional parameter with the actions for the actions group.
+```
+Reactions.connect('list2', undefined,
+    (dispatch, ownProps, actions) => ({
+        actions: bindActionCreators({
+            AddItem: () => actions.AddItem('Foo')
+        }, dispatch)
+    }))(Test);
+```
+Of course you may specify both manually.  See the connect.js Jest test for an example of all three.

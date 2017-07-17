@@ -1,10 +1,14 @@
+var connect = require('react-redux').connect;
+var bindActionCreators = require('redux').bindActionCreators;
 var ReactionsTemplate = {
     actions: {},
     actionsGroup: {},
     actionsStateMap: {},
+    groupStateMap: {},
     reducerTree: {},
     addReactions: addReactions,
     reduce: topLevelReducer,
+    connect: reactionsConnect,
     stateChanges: stateChanges,
     clear: clear
 }
@@ -14,7 +18,28 @@ export var Reactions = Object.assign({}, ReactionsTemplate);
 function clear () {
     return Object.assign(Reactions, ReactionsTemplate);
 }
-
+function reactionsConnect(group, mapStateToProps, mapDispatchToProps, mergeProps, options) {
+    var mapStateSliceToProps = mapStateToProps ?
+        function (state, props) {
+            var slice = mapStateMap(state, Reactions.groupStateMap[group])
+            return mapStateToProps(slice, props);
+        } :
+        function (state, props) {
+            var mappedState = mapStateMap(state, Reactions.groupStateMap[group]);
+            var stateSlice = {};
+            for (var prop in Reactions.groupStateMap[group])
+                stateSlice[prop] = mappedState[prop];
+            return stateSlice;
+        };
+    var mapDispatchBoundToProps =  mapDispatchToProps ?
+        function (dispatch, ownProps) {
+            return mapDispatchToProps(dispatch, ownProps, Reactions.actionsGroup[group]);
+        } :
+        function (dispatch) {
+            return {actions: bindActionCreators(Reactions.actionsGroup[group], dispatch)}
+        }
+    return connect(mapStateSliceToProps, mapDispatchBoundToProps, mergeProps, options);
+}
 function addReactions (newReactions, substitutions, group) {
     for (var reactionName in newReactions)
         prepareReaction(newReactions[reactionName], reactionName, substitutions, group);
@@ -105,9 +130,12 @@ function topLevelReducer(rootState, action) {
     }
     // Find the value of a slice key in the format of [action|state.prop1.prop2 etc]
     function evaluate (reactionNodeKey, reactionNodeValue, element, propOrIndex) {
-        if (typeof reactionNodeValue.evaluate == "function")
-            return reactionNodeValue.evaluate.call(null, action, reactionNodeValue.evaluate.noMap ? rootState : mapState(rootState), element, propOrIndex);
-        else
+        if (typeof reactionNodeValue.evaluate == "function") {
+            if (reactionNodeValue.evaluate.noMap)
+                return reactionNodeValue.evaluate.call(null, rootState, element, propOrIndex);
+            else
+                return reactionNodeValue.evaluate.call(null, action, mapState(rootState), element, propOrIndex);
+        } else
             return reactionNodeKey === propOrIndex;
     }
     /**
@@ -118,35 +146,40 @@ function topLevelReducer(rootState, action) {
      */
     function mapState(rootState) {
         var stateMap = Reactions.actionsStateMap[action.type];
-        if (stateMap) {
-            var newState = Object.assign({}, rootState);
-            for (var stateProp in stateMap)
-                if (newState[stateProp])
-                    newState[stateProp] = evaluateState(stateMap[stateProp])
-            return newState;
-        } else
-            return rootState;
-
-        function evaluateState(stateSlices) {
-            var stateSlice = rootState
-            stateSlices.map((sliceComponent) => {
-                if (typeof sliceComponent == 'function') {
-                    if (stateSlice instanceof Array)
-                        stateSlice = stateSlice.find((item, index) => sliceComponent.call(null, action, rootState, item, index));
-                    else {
-                        var stateSliceProps = Object.getOwnPropertyNames(stateSlice);
-                        var stateSliceProp = stateSliceProps.find((prop)=> sliceComponent.call(null, action, rootState, stateSlice[prop]))
-                        stateSlice = stateSlice[stateSliceProp];
-                    }
-                } else {
-                    stateSlice = stateSlice[sliceComponent];
-                }
-            });
-            return stateSlice;
-        }
+        return mapStateMap(rootState, stateMap);
     }
 
 };
+
+function mapStateMap(rootState, stateMap) {
+    if (stateMap) {
+        var newState = Object.assign({}, rootState);
+        for (var stateProp in stateMap)
+            if (newState[stateProp])
+                newState[stateProp] = evaluateState(stateMap[stateProp])
+        return newState;
+    } else
+        return rootState;
+
+    function evaluateState(stateSlices) {
+        var stateSlice = rootState
+        stateSlices.map((sliceComponent) => {
+            if (typeof sliceComponent == 'function') {
+                if (stateSlice instanceof Array)
+                    stateSlice = stateSlice.find((item, index) => sliceComponent.call(null, rootState, item, index));
+                else {
+                    var stateSliceProps = Object.getOwnPropertyNames(stateSlice);
+                    var stateSliceProp = stateSliceProps.find((prop)=> sliceComponent.call(null, rootState, stateSlice[prop]))
+                    stateSlice = stateSlice[stateSliceProp];
+                }
+            } else {
+                stateSlice = stateSlice[sliceComponent];
+            }
+        });
+        return stateSlice;
+    }
+}
+
 
 /**
  * Produce a slice tree that encapsulates actions like ...
@@ -194,6 +227,7 @@ function prepareReaction(reaction, reactionName, substitutions, group) {
 
     Reactions.actions[reactionName] = actionFunction;
     Reactions.actionsStateMap[reactionName] = substitutions;
+    Reactions.groupStateMap[group] = substitutions;
 
     if (!reaction.state)
         throw new Error("redux-reactions: Missing state property in " + reactionName);

@@ -31,7 +31,8 @@ export var todoList = {
         action:
             (idToToggle) => ({id: idToToggle}),
         state: [{
-            slice: ['domain', 'todoList', (action, state, item) => action.id == item.id],
+            slice: ['domain', 'todoList', (action, state, item) => {
+                return action.id == item.id}],
             assign:    (action, state, item) => ({completed: !item.completed})
         }]},
     FilterList: {
