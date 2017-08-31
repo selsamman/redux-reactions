@@ -1,5 +1,5 @@
-# redux-redactions
-## Simplify Redux
+# Reactions
+## Simplify Redux with Reactions
 React and Redux make a powerful way to organize your state.  In their vanilla form you create actions which are dispatched by your components and then handled by reducer functions which ultimately render a new state with only the relevant state properties mutated.  You do this by writing:
 * Actions
 * Reducers
@@ -14,7 +14,7 @@ The goal of this project is to reduce the number of moving parts and glue code t
 * A function that returns a new value for that part of the state
 * Any selectors that components or actions may need to reference state
 
-Redactions provides a master reducer that calls out to your reaction when it needs a new value for a part of the state that was effected by an action.  This means not having to create a hierarchy of reducers.  Finally these reactions can be grouped and connected to a component with two simple calls.  As a further benefit the reactions can be 'mapped' to a particular part of the state graph so they can be ignorant of the application as whole and independent of whether they are used once or multiple times in the applicaiton. 
+Reactions provides a master reducer that calls out to your reaction when it needs a new value for a part of the state that was effected by an action.  This means not having to create a hierarchy of reducers.  Finally these reactions can be grouped and connected to a component with two simple calls.  As a further benefit the reactions can be 'mapped' to a particular part of the state graph so they can be ignorant of the application as whole and independent of whether they are used once or multiple times in the applicaiton. 
 
 ## Usage
 
@@ -22,8 +22,10 @@ Add reactions to your project
 ```
 npm install --save redux-redactions
 ```
-
-> This is still a work in progress.  The author has incorporated it into a working react-native project and it is ready for others to use.  However it is probably that breaking changes will be needed as it is refined with more usage in real-world apps.
+```
+import Reactions from 'redux-redactions'
+```
+> This is still a work in progress.  The author has incorporated it into a working react-native project and it is ready for others to use.  However it is likely that breaking changes will be needed as it is refined with more usage in real-world apps.
 
 
 Define your Reactions.  Reactions are a combination of an action creator and a state declaration.  The state declaration defines the slice of the state being affected and a new value for that slice of the state:
@@ -67,7 +69,7 @@ const todoListReactions = {
 ```
 Add your reaction definitions as reactions:
 ```
-import {Reactions} from 'redux-redactions';
+import Reactions from 'redux-redactions';
 Reactions.addReactions(todoListReactions);
 ```
 Connect them to redux:
@@ -235,7 +237,7 @@ Reactions.connect is a wrapper around react-redux's connect that maps reaction g
 
 ```
 const mapStateToProps1 = state => ({todoList: state.domain.todoList, filter: state.app.filter});  
-const todoList1 = Redactions.connect('list1', mapStateToProps1)(TodoList)
+const todoList1 = Reactions.connect('list1', mapStateToProps1)(TodoList)
 ```
 Here we have provided two properties, todoList and filter which will return the correct values for list1.  We have also mapped all of the reactions for list1 as properties as well.
 
@@ -276,7 +278,7 @@ let todoList2 = Reactions.connect('list2')(TodoList);
 ```
 ### Using Selectors and Actions in Action Creators
 
-The final benefit of Reactions.connect is that it binds action creators such that when they are called *this* points to the properties that are bound to the component via the Redactions.connect call.  This means that if you use thunks you can invoke actions and selectors easily:
+The final benefit of Reactions.connect is that it binds action creators such that when they are called *this* points to the properties that are bound to the component via the Reactions.connect call.  This means that if you use thunks you can invoke actions and selectors easily:
 ```
 bankReactions = {
     accountBalance: (state) => (state.domain.balance)
