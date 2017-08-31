@@ -1,7 +1,6 @@
 import React, {Component} from 'react';
-import {Reactions} from '../index.js';
+import Reactions from '../index.js';
 import { Provider } from 'react-redux'
-var bindActionCreators = require('redux').bindActionCreators;
 import { createStore, applyMiddleware} from 'redux';
 import thunk from 'redux-thunk';
 import { shallow, mount, render } from 'enzyme';
@@ -35,8 +34,8 @@ var initialState = {
 class Test extends Component {
     render () {
         return (
-            <a onClick={this.props.actions.AddItem}>
-                <span>{this.props.domain.todoList.length}</span>
+            <a onClick={this.props.AddItem}>
+                <span>{this.props.todoList.length}</span>
             </a>
         )
     }
@@ -58,7 +57,11 @@ describe('Two todoLists', () => {
         Reactions.clear(); // To keep tests separate
         Reactions.addReactions(todoList, stateMap1, 'list1');
         Reactions.addReactions(todoList, stateMap2, 'list2');
-        Reactions.addReactions(todoList, stateMap3, 'list3');
+        const domainSelector = {
+            todoList: (state) => {
+                return state.domain.todoList}
+        };
+        Reactions.addReactions([todoList, domainSelector], stateMap3, 'list3');
 
     });
     it ('can reduce lists', () => {
@@ -70,17 +73,17 @@ describe('Two todoLists', () => {
 
         // Use default action mapper
         var TestList1 = Reactions.connect('list1',
-            (state, props) => ({domain: state.domain, app: state.app}))(Test);
+            (state, props) => ({todoList: state.domain.todoList}))(Test);
         const wrapper1 = mount(<Provider store={store}><TestList1 /></Provider>);
         wrapper1.find('a').simulate('click');
         expect(wrapper1.find('span').html()).toEqual('<span>1</span>');
 
         // Use explicit action mapper
         var TestList2 = Reactions.connect('list2',
-            (state, props) => ({domain: state.domain, app: state.app}),
-            (dispatch, ownProps, actions) => ({actions: bindActionCreators({
-                AddItem: () => actions.AddItem('Foo')
-            }, dispatch)}))(Test);
+            (state, props) => ({todoList: state.domain.todoList}),
+            (ownProps, actions) =>  (Reactions.bindActionCreators({
+                AddItem: actions.AddItem.bind(null, 'Foo')
+            }, store.dispatch)))(Test);
         const wrapper2 = mount(<Provider store={store}><TestList2 /></Provider>);
         wrapper2.find('a').simulate('click');
         wrapper2.find('a').simulate('click');

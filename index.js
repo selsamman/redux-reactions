@@ -1,48 +1,84 @@
 var connect = require('react-redux').connect;
-var bindActionCreators = require('redux').bindActionCreators;
 var ReactionsTemplate = {
     actions: {},
     actionsGroup: {},
+    selectorsGroup: {},
     actionsStateMap: {},
     groupStateMap: {},
     reducerTree: {},
     addReactions: addReactions,
     reduce: topLevelReducer,
     connect: reactionsConnect,
+    bindActionCreators : bindActionCreatorsWithThis,
     stateChanges: stateChanges,
     clear: clear
 }
-
-export var Reactions = Object.assign({}, ReactionsTemplate);
+var Reactions = Object.assign({}, ReactionsTemplate);
+export default Reactions;
 
 function clear () {
     return Object.assign(Reactions, ReactionsTemplate);
 }
 function reactionsConnect(group, mapStateToProps, mapDispatchToProps, mergeProps, options) {
-    var mapStateSliceToProps = mapStateToProps ?
-        function (state, props) {
-            var slice = mapStateMap(state, Reactions.groupStateMap[group])
-            return mapStateToProps(slice, props);
-        } :
-        function (state, props) {
-            var mappedState = mapStateMap(state, Reactions.groupStateMap[group]);
-            var stateSlice = {};
-            for (var prop in Reactions.groupStateMap[group])
-                stateSlice[prop] = mappedState[prop];
-            return stateSlice;
-        };
-    var mapDispatchBoundToProps =  mapDispatchToProps ?
-        function (dispatch, ownProps) {
-            return mapDispatchToProps(dispatch, ownProps, Reactions.actionsGroup[group]);
-        } :
-        function (dispatch) {
-            return {actions: bindActionCreators(Reactions.actionsGroup[group], dispatch)}
+
+    function mapStateSliceToProps (state, props) {
+        var mappedState = mapStateMap(state, Reactions.groupStateMap[group]);
+        var stateSlice = {};
+        for (var prop in Reactions.selectorsGroup[group])
+            stateSlice[prop] = Reactions.selectorsGroup[group][prop](mappedState);
+
+        if (mapStateToProps)
+            Object.assign(stateSlice, mapStateToProps(mappedState, props));
+
+        return stateSlice;
+    };
+
+    function mapDispatchBoundToProps (dispatch, ownProps) {
+        var boundActions = bindActionCreatorsWithThis(Reactions.actionsGroup[group], dispatch);
+        if (mapDispatchToProps)
+            Object.assign(boundActions, typeof mapDispatchToProps == 'function' ?
+                mapDispatchToProps(ownProps, Reactions.actionsGroup[group]) :
+                bindActionCreatorsWithThis(mapDispatchToProps));
+        return boundActions;
+    }
+
+    return connect(mapStateSliceToProps, mapDispatchBoundToProps, mergeProps || mergePropsAndBindActionCreators, options);
+
+    function mergePropsAndBindActionCreators(stateProps, dispatchProps, ownProps) {
+        var props = {}
+        var boundDispatchProps = {};
+        for (var name in dispatchProps) {
+            var prop = dispatchProps[name];
+            boundDispatchProps[name] = typeof prop === 'function' ? dispatchProps[name].bind(props) : prop;
         }
-    return connect(mapStateSliceToProps, mapDispatchBoundToProps, mergeProps, options);
+        Object.assign(props, stateProps, boundDispatchProps, ownProps);
+        return props;
+    }
 }
+function bindActionCreatorsWithThis(actions, dispatch) {
+    var dispatches = {}
+    for (var action in actions) {
+        (function () {
+            var closureAction = action;
+            dispatches[action] =  function () {
+                dispatch(actions[closureAction].apply(this, arguments));
+            }
+        })()
+    }
+    return dispatches;
+}
+
 function addReactions (newReactions, substitutions, group) {
-    for (var reactionName in newReactions)
-        prepareReaction(newReactions[reactionName], reactionName, substitutions, group);
+    if (newReactions instanceof Array)
+        return newReactions.map((reactions) => addReactions(reactions, substitutions, group));
+    for (var name in newReactions) {
+        var reactionOrSelector = newReactions[name];
+        if (typeof reactionOrSelector === 'function')
+            prepareSelector(reactionOrSelector, name, substitutions, group);
+        else
+            prepareReaction(reactionOrSelector, name, substitutions, group);
+    }
+    //console.log(JSON.stringify(Reactions));
 }
 
 // This reducer will wall through all the states while simaltaniously traversing a tree of reaction declarations
@@ -179,8 +215,14 @@ function mapStateMap(rootState, stateMap) {
         return stateSlice;
     }
 }
+function prepareSelector(selector, selectorName, substitutions, group) {
 
-
+    if (group) {
+        Reactions.selectorsGroup[group] =  Reactions.selectorsGroup[group] || {};
+        Reactions.selectorsGroup[group][selectorName] = selector;
+        Reactions.groupStateMap[group] = substitutions;
+    }
+}
 /**
  * Produce a slice tree that encapsulates actions like ...
  *
@@ -206,7 +248,7 @@ function mapStateMap(rootState, stateMap) {
                 }
              }
  }
-*/
+ */
 function prepareReaction(reaction, reactionName, substitutions, group) {
 
     var originalreactionName = reactionName;
@@ -216,7 +258,7 @@ function prepareReaction(reaction, reactionName, substitutions, group) {
         throw new Error("redux-reactions: Missing actions property in " + reactionName);
 
     var actionFunction = function () {
-        var action = reaction.action.apply(null, arguments);
+        var action = reaction.action.apply(this, arguments);
         action.type = reactionName;
         return action;
     };
@@ -228,9 +270,6 @@ function prepareReaction(reaction, reactionName, substitutions, group) {
     Reactions.actions[reactionName] = actionFunction;
     Reactions.actionsStateMap[reactionName] = substitutions;
     Reactions.groupStateMap[group] = substitutions;
-
-    if (!reaction.state)
-        throw new Error("redux-reactions: Missing state property in " + reactionName);
 
     // Process each reducer and produce composition state map
     reaction.state.map(function (sliceReducer, sliceKey)  {
@@ -297,4 +336,3 @@ function stateChanges (oldState, newState) {
         return reducer(accumulator, currentIndex);
     }
 }
-// Normalize object and a array reduction so we allways have and index into the state being copied

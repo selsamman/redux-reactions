@@ -1,10 +1,10 @@
 import React, {Component} from 'react';
-import {Reactions} from '../index.js';
+import Reactions from '../index.js';
 import { createStore, applyMiddleware} from 'redux';
 import { Provider } from 'react-redux';
 import thunk from 'redux-thunk';
 
-export var todoList = {
+export var todoListDomain = {
     AddItem: {
         action:
             (text) => ({text: text}),
@@ -34,8 +34,10 @@ export var todoList = {
             slice: ['domain', 'todoList', (action, state, item) => {
                 return action.id == item.id}],
             assign:    (action, state, item) => ({completed: !item.completed})
-        }]},
-    FilterList: {
+        }]}
+};
+export var todoListApp = {
+     FilterList: {
         action:
             (filter) => ({filter: filter}),
         state: [{
@@ -44,6 +46,7 @@ export var todoList = {
         }]}
 };
 
+export var todoList = [todoListApp, todoListDomain];
 describe('Single Todo List', () => {
     beforeAll(() => {
         Reactions.clear(); // To keep tests separate

@@ -1,12 +1,20 @@
 # redux-redactions
 ## Simplify Redux
-React and Redux make a powerful way to organize your state.  In their vanilla form you create actions which are dispatched by your components and then handled by reducer functions which ultimately render a new state with only the relevant state properties mutated.  This means you have to write:
+React and Redux make a powerful way to organize your state.  In their vanilla form you create actions which are dispatched by your components and then handled by reducer functions which ultimately render a new state with only the relevant state properties mutated.  You do this by writing:
 * Actions
 * Reducers
 * Action types constants to bind the actions and reducers
+* Selectors that provide data to components
 * Higher level reducers that call down to your more specific reducers to ensure only the relevant state properties are mutated
+* Glue code to wire all of this together and connect it to components
 
-Redactions simplifies the organization by combining an action an function that modifies a specific slice of the state.  Because you declare the specific slice of the state to be modified, Redactions handles the higher level reduction and calls your function to get a new state property value. It also has declarative ways to merge in new properties, append to arrays or delete array elements such that you never have to worry about mutation.
+The goal of this project is to reduce the number of moving parts and glue code that you need.  This is done by defining *reactions* which combines the action/reducer functionality into units that contains:
+* The action creator
+* A declaration of what part of the state this action will modify
+* A function that returns a new value for that part of the state
+* Any selectors that components or actions may need to reference state
+
+Redactions provides a master reducer that calls out to your reaction when it needs a new value for a part of the state that was effected by an action.  This means not having to create a hierarchy of reducers.  Finally these reactions can be grouped and connected to a component with two simple calls.  As a further benefit the reactions can be 'mapped' to a particular part of the state graph so they can be ignorant of the application as whole and independent of whether they are used once or multiple times in the applicaiton. 
 
 ## Usage
 
@@ -15,12 +23,12 @@ Add reactions to your project
 npm install --save redux-redactions
 ```
 
-> This is still a work in progres yet to be incorporated into a serious React project.
+> This is still a work in progress.  The author has incorporated it into a working react-native project and it is ready for others to use.  However it is probably that breaking changes will be needed as it is refined with more usage in real-world apps.
 
 
-Define your Reactions.  Reactions are a combination of reducers and actions:
+Define your Reactions.  Reactions are a combination of an action creator and a state declaration.  The state declaration defines the slice of the state being affected and a new value for that slice of the state:
 ```
-let todoList = {
+const todoListReactions = {
     AddItem: {
         action:
             (text) => ({text: text}),
@@ -60,12 +68,12 @@ let todoList = {
 Add your reaction definitions as reactions:
 ```
 import {Reactions} from 'redux-redactions';
-Reactions.addReactions(todoList);
+Reactions.addReactions(todoListReactions);
 ```
 Connect them to redux:
 ```
 const createStoreWithMiddleware = applyMiddleware(thunk)(createStore);
-let state = {
+let initialState = {
     domain: {
         todoList: [
         ],
@@ -73,7 +81,7 @@ let state = {
     },
     app: {filter: 'SHOW_ALL'}
 };
-const store = createStoreWithMiddleware(Reactions.reduce, state);
+const store = createStoreWithMiddleware(Reactions.reduce, initialState);
 ```
 Dispatch them:
 ```
@@ -92,37 +100,37 @@ You can easily write tests for your reactions and ensure that not only do they d
 
 ```
 ## Anatomy of a Reaction
-A reaction is a definition of both an action and a reducer handler.  Each reaction is defined as a property where the property name is the reaction type.  
+Each reaction is defined as a property where the property name is the action type:  
 ```
 let todoList = {
     AddItem: {
 ```
 The property contains further properties that
-* define the function that returns an action you can dispatch:
+* returns an action creator:
 ```
         action:
             (idToToggle) => ({id: idToToggle}),
 ```
-* define the state slice that will be affected by the action and how that state will be changed: 
+* defines the state slice that will be affected by the action and how that state will be changed: 
 ```
         state: [{
             slice: ['domain', 'todoList', (action, state, item) => action.id == item.id],
             assign:    (action, state, item) => ({completed: !item.completed})
         }]},
 ```
-The state slice  defines the particlular part of the state hierarchy that your reducer handler will effect.  It is defined as an array of property names describes the state property hierarchy.  When a state property is an array or a hash you may specify a function that will be used to specify array or hash element.  This function is called for every element and returns true to select that element.  It is passed:
+The state slice  defines the particular part of the state hierarchy that your reducer handler will effect as an array that describes the state hierarchy.  When an element in the heirarchy is an array or a hash you may specify a function that will be used to specify the particular element instance.  This function is called for every element and returns true to select that element.  It is passed:
  * the action
  * the top level state
  * the element itself,
  * the index of the element if the property is an array
   
-  The state slice also defines the state handler which is a function that will either return a new value for the state element or an object to be merged with the existing state.  These types of state handlers are possible and specified by property key::
+  The state slice also defines the state handler which is a function that will either return a new value for the state element or an object to be merged with the existing state.  These types of state handlers are possible and specified by property key:
 * **assign: (action, state, item)** - a function that will return properties to be merged into a copy of the state (similar to Object.assign) 
 * **set: (action, state, item)** - a function returning a new value for that slice of the state
 * **append: (action, state, item)** - a function returning a new value to be concatenated to this slice of the state which must be an array.  Similar to Array.concat.
 * **delete: true** - returns undefined for the new state.  Use for array elements which are to be deleted since any elements set to null or undefined will be removed from the array.
 
-The assign, set and append state handlers have these arguments:
+For assign, set and append you provide a function to provide a new value for that slice of that state.  That function is passed:
 * **action** - the action object returned from the action function
 * **state** - the root of the state heirarchy
 * **item** - the particular slice of the state heirarchy as defined by the slice property
@@ -131,7 +139,7 @@ The assign, set and append state handlers have these arguments:
 
 ## State Composition
 
-Although your reactions may be written to be aware of the entire state graph you might actually want to have them be independent of where they fit into the state of a large application.  For example you might have multiple todoLists and select a  'current one' or you might have several todoLists active at the same time.  In all cases your reactions need not know anything other than what they need to manage a single todoList just as you would expect your todoList component to only know about the todoList it was dealing with.
+Although your reactions may be written to be aware of the entire state graph you might actually want to have them be independent of where they fit into the state graph of a large application.  For example you might have multiple todoLists and select a  'current one' or you might have several todoLists active at the same time.  In all cases your todoList reactions should be ignorant of these details and just manage a single todoList..
  
 Let's say you wanted to have multiple todoLists with one active at a time. Your state might look like this:
 ```
@@ -185,7 +193,7 @@ let initialState = {
     }
 };
 ```
-Now you need two state maps ot map app and domain to the correct part of the overall state:
+Now you need two state maps to map *app* and *domain* to the correct part of the overall state:
  ```
  let stateMap1 = {
      app: ['app', 'list2'],
@@ -198,48 +206,107 @@ let stateMap2 = {
 ```
 And you can now connect each state map to the same set of actions by passing a group name when you add each set of reactions: 
  ```
-  Reactions.addReactions(todoList, stateMap1, 'list1');
-  Reactions.addReactions(todoList, stateMap2, 'list2');
+  Reactions.addReactions(todoListReactions, stateMap1, 'list1');
+  Reactions.addReactions(todoListReactions, stateMap2, 'list2');
  ```
 This will result in two sets of actions each of which has a different state map.  You can refer to them as:
 ```
-    Reactions.actionGroup.list1.AddItem
-    Reactions.actionGroup.list2.AddItem
+    Reactions.actionGroup.list1.AddItem("First Item");
+    Reactions.actionGroup.list2.AddItem("First Item");
 ````
-This makes it easy to connect up a component that deals with one list or the other:
+
+##Usage With React
+Once you have your reactions organized into groups there are several ways to connect them to a component.  Lets start with a basic one that still deals with multiple todoLists:
 ```
-let todoList1 = connect(
-    state => ({domain: {todoList: state.domain.list1}, app: {todoList: state.app.list1),
-    dispatch => ({actions: bindActionCreators(Reactions.actionGroup.list1)
-)(TodoList);
-
-let todoList2 = connect(
-   state => ({domain: {todoList: state.domain.list2}, app: {todoList: state.app.list2)),
-    dispatch => ({actions: bindActionCreators(Reactions.actionGroup.list1})
-)(TodoList);
+const mapStateToProps1 = state => ({todoList: state.domain.list1.todoList, filter: state.app.list1.filter});
+const mapDispatchToProps1 = dispatch => (bindActionCreators(Reactions.actionGroup.list1));    
+const todoList1 = connect(mapStateToProps1, dispatchToProps1)(TodoList);
+```
+```
+const mapStateToProps2 = state => ({todoList: state.domain.list2.todoList, filter: state.app.list2.filter});
+const mapDispatchToProps2 = dispatch => (bindActionCreators(Reactions.actionGroup.list2));    
+const todoList2 = connect(mapStateToProps1, dispatchToProps1)(TodoList);
 ````
-In effect what we have created is a structure for reducers and actions that is parallel to the mechanism you would normally use in connecting a component to state -- that is setting the state props to reflect just the part of the state relevant to the component instance.
+Now when either of the these components calls this.props.addItem() it will be referring to the correct todoList.  In effect what we have created is a mechanism for reducers and actions that is parallel to the mechanism for mapping state properties from just the relevant slice of the state map.
 
-## Automatically Connecting to a React Component
+## Mapping a State Slice to Properties
 
-Reactions.connect is a wrapper around connect that maps reaction groups to a component.  It is used in place of the redux connect. 
+Reactions.connect is a wrapper around react-redux's connect that maps reaction groups to a component.  It's primary benefit is providing a slice of the state defined in the state map associated with your group such that when you map state to properties you are mapping just that slice of the state to the properties. It also automatically maps the action creators in the group to properties as functions that will dispatch the action.
+
+```
+const mapStateToProps1 = state => ({todoList: state.domain.todoList, filter: state.app.filter});  
+const todoList1 = Redactions.connect('list1', mapStateToProps1)(TodoList)
+```
+Here we have provided two properties, todoList and filter which will return the correct values for list1.  We have also mapped all of the reactions for list1 as properties as well.
+
+## Selectors
+
+Although you can certainly map individual state elements to properties using mapStateToProps, best practices suggest using selectors.  This gives you the possibility of using memoized selectors for better performance.  You can also group your selectors along with the reactions such that everything is one place.  Selectors are simply functions that given the state will return a value.
+
+```
+const todoListSelectors = {
+    todoList: (state) => state.domain.todoList,
+    filter: (state) => state.app.todoList,
+    visibleTodos: (state) => (createSelector(
+        [todoListSelector.todoList, todoListSelector.filter],
+        (todos, filter) => {
+            switch (filter) {
+                case 'SHOW_ALL':
+                    return todos
+                case 'SHOW_COMPLETED':
+                    return todos.filter(t => t.completed)
+                case 'SHOW_ACTIVE':
+                    return todos.filter(t => !t.completed)
+            }
+        }
+    }
+}
+
+```
+You can make the selectors part of a reactions group by composing them using an array: 
+ ```
+  Reactions.addReactions([todoListReactions, todoListSelectors], stateMap1, 'list1');
+  Reactions.addReactions([todoListReactions, todoListSelectors], stateMap2, 'list2');
+ ```
+And when you connect this to react component it will connect the selectors to your property as well
+
 ```
 let todoList1 = Reactions.connect('list1')(TodoList);
+let todoList2 = Reactions.connect('list2')(TodoList);
 ```
-It will map the state properties from 'list1' to your properties (domain and app in this case) and will map all of the actions in actionGroup.list1 as bound actions to your properties.
+### Using Selectors and Actions in Action Creators
 
-You can also manually specify the mapStateToProps function and map them yourself.   The state you recieve in the state parameter will have already been mapped for you using the stateMap so that in this cas you map directly to state.domain rather than state.domain.list1
+The final benefit of Reactions.connect is that it binds action creators such that when they are called *this* points to the properties that are bound to the component via the Redactions.connect call.  This means that if you use thunks you can invoke actions and selectors easily:
 ```
-let todoList1 = Reactions.connect('list1', 
-    (state, props) => ({domain: state.domain, app: state.app}))(Test);
+bankReactions = {
+    accountBalance: (state) => (state.domain.balance)
+    withdraw: {
+        action: (amount) => () => { // dispatch and getState not needed
+            if (amount > this.accountBalance()) 
+                this.overdraft(amount);
+            else
+                this.debit(amount);   
+        }
+    },
+    overdraft: {.....}
+    debit: {.....}
+}
 ```
-You also manually specify the mapActionToProps function and map the actions your self.  You will recieve an additional parameter with the actions for the actions group.
-```
-Reactions.connect('list2', undefined,
-    (dispatch, ownProps, actions) => ({
-        actions: bindActionCreators({
-            AddItem: () => actions.AddItem('Foo')
-        }, dispatch)
-    }))(Test);
-```
-Of course you may specify both manually.  See the connect.js Jest test for an example of all three.
+
+###Reactions.connect Usage
+Reactions.connect is a pre-processor for redux connect that connects a reactions group to your component as well as fulfilling all of the other requirements of redux-react's connect. It provides these benefits:
+
+* Maps all selectors in your reactions to props
+* Maps all actions in your reactions to props as dispatchable functions invoked with *this* pointing to properties passed to the component (see next section on thunks)
+* When using mapStateToProps it provides the slice of the state specified in the state map associated with the group.reaction actions as dispatchable functions Uses the state map to map your state to properties.
+
+Your mapStateToProps function will override any selectors by the same name.
+You also specify the mapActionToProps object or function and map the actions your self.  When using the function you are expected to provide action creators bound to dispatch.  If you also want the benefit of having props being passed to them as *this* you need to pass through *this* when binding them.  Reductions also exports it's own bindActionCreators which you can use in place of react-redux's bindActionCreators to facilitate in doing this.
+### Reaction Composition with React
+
+You can think of your reactions as chunks of business logic for your application. It consists of:
+ * Actions to be performed that may be invoked both from components and from other actions. Actions either modify state or as thunks may call on other actions that do so.
+ * The definition of how the state will be modified by an action if it does modify state.  It may modify one or more slices of the state.
+ * Data that is to be consumed (selectors).  Selectors may be used either by your actions (simple action creators or thunks) or they may be consumed by components that connect to these reactions.
+ 
+ Selectors and actions can be freely intermixed or composed.  Anywhere a reaction object is expected an array can be used to compose multiple reactions.  This let's you break up reactions into smaller files and then compose them into actual groups that you would add as reactions.  Reactions can depend on each other by composing your reactions and imported reactions using this mechanism.  For readability and modularity we recommend creating smaller reaction objects and composing them as needed.
