@@ -72,7 +72,7 @@ Add your reaction definitions as reactions:
 import Reactions from 'redux-redactions';
 Reactions.addReactions(todoListReactions);
 ```
-Connect them to redux:
+Connect them to redux (you must include thunk):
 ```
 const createStoreWithMiddleware = applyMiddleware(thunk)(createStore);
 let initialState = {
@@ -276,18 +276,18 @@ And when you connect this to react component it will connect the selectors to yo
 let todoList1 = Reactions.connect('list1')(TodoList);
 let todoList2 = Reactions.connect('list2')(TodoList);
 ```
-### Using Selectors and Actions in Action Creators
+### Using Selectors and Actions in Thunks
 
-The final benefit of Reactions.connect is that it binds action creators such that when they are called *this* points to the properties that are bound to the component via the Reactions.connect call.  This means that if you use thunks you can invoke actions and selectors easily:
+The final benefit of Reactions.connect is that it binds thinks with an additional first parameter which is the properties that are bound to the component via the Reactions.connect call.  This means that if you use thunks you can invoke actions and selectors easily:
 ```
 bankReactions = {
     accountBalance: (state) => (state.domain.balance)
     withdraw: {
-        action: (amount) => () => { // dispatch and getState not needed
-            if (amount > this.accountBalance()) 
-                this.overdraft(amount);
+        action: (amount) => (props, dispatch, getState) => {
+            if (amount > props.accountBalance) 
+                props.overdraft(amount);
             else
-                this.debit(amount);   
+                props.debit(amount);   
         }
     },
     overdraft: {.....}

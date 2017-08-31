@@ -9,7 +9,7 @@ var ReactionsTemplate = {
     addReactions: addReactions,
     reduce: topLevelReducer,
     connect: reactionsConnect,
-    bindActionCreators : bindActionCreatorsWithThis,
+    bindActionCreators : bindActionCreatorsDeferred,
     stateChanges: stateChanges,
     clear: clear
 }
@@ -34,11 +34,11 @@ function reactionsConnect(group, mapStateToProps, mapDispatchToProps, mergeProps
     };
 
     function mapDispatchBoundToProps (dispatch, ownProps) {
-        var boundActions = bindActionCreatorsWithThis(Reactions.actionsGroup[group], dispatch);
+        var boundActions = bindActionCreatorsDeferred(Reactions.actionsGroup[group], dispatch);
         if (mapDispatchToProps)
             Object.assign(boundActions, typeof mapDispatchToProps == 'function' ?
                 mapDispatchToProps(ownProps, Reactions.actionsGroup[group]) :
-                bindActionCreatorsWithThis(mapDispatchToProps));
+                bindActionCreatorsDeferred(mapDispatchToProps));
         return boundActions;
     }
 
@@ -49,19 +49,28 @@ function reactionsConnect(group, mapStateToProps, mapDispatchToProps, mergeProps
         var boundDispatchProps = {};
         for (var name in dispatchProps) {
             var prop = dispatchProps[name];
-            boundDispatchProps[name] = typeof prop === 'function' ? dispatchProps[name].bind(props) : prop;
+            boundDispatchProps[name] = typeof prop === 'function' ? dispatchProps[name].bind(null, props) : prop;
         }
         Object.assign(props, stateProps, boundDispatchProps, ownProps);
         return props;
     }
 }
-function bindActionCreatorsWithThis(actions, dispatch) {
+function bindActionCreatorsDeferred(actions, dispatch) {
     var dispatches = {}
-    for (var action in actions) {
+    for (var actionName in actions) {
         (function () {
-            var closureAction = action;
-            dispatches[action] =  function () {
-                dispatch(actions[closureAction].apply(this, arguments));
+            var closureAction = actionName;
+            dispatches[actionName] =  function () {
+                var props = arguments[0];
+                var args = Array.prototype.slice.call(arguments, 1);
+                return dispatch(thunk);
+                function thunk(dispatch, getState) {
+                    var actionResult = actions[closureAction].apply(null, args); // reactions thunk or action object
+                    if (typeof actionResult == 'function') // Reactions thunk
+                        return actionResult.apply(null, [props, dispatch, getState]); // Invoke our thunk
+                    else
+                        dispatch(actionResult);
+                }
             }
         })()
     }
@@ -270,6 +279,9 @@ function prepareReaction(reaction, reactionName, substitutions, group) {
     Reactions.actions[reactionName] = actionFunction;
     Reactions.actionsStateMap[reactionName] = substitutions;
     Reactions.groupStateMap[group] = substitutions;
+
+    if (!reaction.state)
+        return;
 
     // Process each reducer and produce composition state map
     reaction.state.map(function (sliceReducer, sliceKey)  {

@@ -40,6 +40,15 @@ class Test extends Component {
         )
     }
 }
+class TestWithThunk extends Component {
+    render () {
+        return (
+            <a onClick={this.props.AddItemWithThunk}>
+                <span>{this.props.todoList.length}</span>
+            </a>
+        )
+    }
+}
 var stateMap1 = {
     app: ['app', 'list1'],
     domain: ['domain', 'list1']
@@ -73,7 +82,7 @@ describe('Two todoLists', () => {
 
         // Use default action mapper
         var TestList1 = Reactions.connect('list1',
-            (state, props) => ({todoList: state.domain.todoList}))(Test);
+            (state, props) => ({todoList: state.domain.todoList}))(TestWithThunk);
         const wrapper1 = mount(<Provider store={store}><TestList1 /></Provider>);
         wrapper1.find('a').simulate('click');
         expect(wrapper1.find('span').html()).toEqual('<span>1</span>');

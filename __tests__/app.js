@@ -20,6 +20,11 @@ export var todoListDomain = {
             slice: ['app', 'filter'],
             set:    (action, state, filter) => filter.filter === 'SHOW_ACTIVE' ? filter.filter : 'SHOW_ALL'
         }]},
+    AddItemWithThunk: {
+        action: (text) => (props) => {
+            props.AddItem(text);
+        }
+    },
     DeleteItem: {
         action:
             (idToDelete) => ({id: idToDelete}),
