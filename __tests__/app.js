@@ -20,6 +20,21 @@ export var todoListDomain = {
             slice: ['app', 'filter'],
             set:    (action, state, filter) => filter.filter === 'SHOW_ACTIVE' ? filter.filter : 'SHOW_ALL'
         }]},
+    InsertItem: {
+        action:
+            (position, text) => ({position: position, text: text}),
+        state: [{
+            slice: ['domain', 'nextId'],
+            set:    (action, state, nextId) => nextId + 1
+        },{
+            slice: ['domain', 'todoList'],
+            insert:    (action, state, toDoList, domain) => {
+                return [action.position, {text: action.text, id: state.domain.nextId, completed: false}]
+            }
+        },{
+            slice: ['app', 'filter'],
+            set:    (action, state, filter) => filter.filter === 'SHOW_ACTIVE' ? filter.filter : 'SHOW_ALL'
+        }]},
     AddItemWithThunk: {
         action: (text) => (props) => {
             props.AddItem(text);
@@ -155,7 +170,7 @@ describe('Single Todo List', () => {
         expect(state.domain.todoList instanceof Array).toEqual(true);
         expect(Reactions.stateChanges(state, oldState)).toEqual('domain;domain.todoList;domain.nextId;app;');
 
-        action = Reactions.actions.AddItem("Second Item");
+        action = Reactions.actions.InsertItem(1, "Second Item");
         oldState = state;
         state = Reactions.reduce(state, action);
         expect(state.domain.todoList.length).toEqual(2);

@@ -5,16 +5,16 @@ React and Redux make a powerful way to organize your state.  In their vanilla fo
 * Reducers
 * Action types constants to bind the actions and reducers
 * Selectors that provide data to components
-* Higher level reducers that call down to your more specific reducers to ensure only the relevant state properties are mutated
+* A hierarchy of reducers that walks through your state graph an delegates to individul reducers that provide new state values for your action.
 * Glue code to wire all of this together and connect it to components
 
-The goal of this project is to reduce the number of moving parts and glue code that you need.  This is done by defining *reactions* which combines the action/reducer functionality into units that contains:
+The goal of this project is to reduce the number of moving parts that you need.  This is done with *reactions* which contain:
 * The action creator
 * A declaration of what part of the state this action will modify
 * A function that returns a new value for that part of the state
 * Any selectors that components or actions may need to reference state
 
-Reactions provides a master reducer that calls out to your reaction when it needs a new value for a part of the state that was effected by an action.  This means not having to create a hierarchy of reducers.  Finally these reactions can be grouped and connected to a component with two simple calls.  As a further benefit the reactions can be 'mapped' to a particular part of the state graph so they can be ignorant of the application as whole and independent of whether they are used once or multiple times in the applicaiton. 
+Reactions provides a master reducer that calls out to your reaction when it needs a new value for a part of the state that was effected by an action.  This means not having to create a hierarchy of reducers.  Reactions can be composed and connected to a component.  They can also be 'mapped' to a particular part of the state graph so they remain atomic.
 
 ## Usage
 
@@ -130,6 +130,7 @@ The state slice  defines the particular part of the state hierarchy that your re
 * **assign: (action, state, item)** - a function that will return properties to be merged into a copy of the state (similar to Object.assign) 
 * **set: (action, state, item)** - a function returning a new value for that slice of the state
 * **append: (action, state, item)** - a function returning a new value to be concatenated to this slice of the state which must be an array.  Similar to Array.concat.
+* **insert: (action, state, item)** - a function returning an array where the first element is the position in the array at which the new value should be inserted and the second element is the value to be inserted. 
 * **delete: true** - returns undefined for the new state.  Use for array elements which are to be deleted since any elements set to null or undefined will be removed from the array.
 
 For assign, set and append you provide a function to provide a new value for that slice of that state.  That function is passed:

@@ -165,6 +165,11 @@ function topLevelReducer(rootState, action) {
             return reducer.set.call(null, action, mapState(rootState), newState);
         } else if (reducer.append) {
             return newState.concat(reducer.append.call(null, action, mapState(rootState), newState));
+        } else if (reducer.insert) {
+            const insertResult = reducer.insert.call(null, action, mapState(rootState), newState);
+            const shallowCopy = newState.slice();
+            shallowCopy.splice(insertResult[0], 0, insertResult[1]);
+            return shallowCopy;
         } else if (reducer.assign) {
             return Object.assign({}, newState, reducer.assign.call(null, action, mapState(rootState), newState));
         } else if (reducer.delete) {
