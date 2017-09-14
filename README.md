@@ -93,6 +93,7 @@ You can easily write tests for your reactions and ensure that not only do they d
 ```
         let oldState = state;
         store.dispatch(Reactions.actions.AddItem("First Item"));
+        let state = store.getState();
         expect(state.domain.todoList.length).toEqual(1);
         expect(state.domain.todoList[0].text).toEqual("First Item");
         expect(state.domain.todoList[0].completed).toEqual(false);
