@@ -278,7 +278,7 @@ And when you connect this to react component it will connect the selectors to yo
 let todoList1 = Reactions.connect('list1')(TodoList);
 let todoList2 = Reactions.connect('list2')(TodoList);
 ```
-### Using Selectors and Actions in Thunks
+## Using Selectors and Actions in Thunks
 
 The final benefit of Reactions.connect is that it binds thinks with an additional first parameter which is the properties that are bound to the component via the Reactions.connect call.  This means that if you use thunks you can invoke actions and selectors easily:
 ```
@@ -297,7 +297,7 @@ bankReactions = {
 }
 ```
 
-###Reactions.connect Usage
+##Reactions.connect Usage
 Reactions.connect is a pre-processor for redux connect that connects a reactions group to your component as well as fulfilling all of the other requirements of redux-react's connect. It provides these benefits:
 
 * Maps all selectors in your reactions to props
@@ -306,7 +306,7 @@ Reactions.connect is a pre-processor for redux connect that connects a reactions
 
 Your mapStateToProps function will override any selectors by the same name.
 You also specify the mapActionToProps object or function and map the actions your self.  When using the function you are expected to provide action creators bound to dispatch.  If you also want the benefit of having props being passed to them as *this* you need to pass through *this* when binding them.  Reductions also exports it's own bindActionCreators which you can use in place of react-redux's bindActionCreators to facilitate in doing this.
-### Reaction Composition with React
+## Reaction Composition with React
 
 You can think of your reactions as chunks of business logic for your application. It consists of:
  * Actions to be performed that may be invoked both from components and from other actions. Actions either modify state or as thunks may call on other actions that do so.
@@ -314,3 +314,43 @@ You can think of your reactions as chunks of business logic for your application
  * Data that is to be consumed (selectors).  Selectors may be used either by your actions (simple action creators or thunks) or they may be consumed by components that connect to these reactions.
  
  Selectors and actions can be freely intermixed or composed.  Anywhere a reaction object is expected an array can be used to compose multiple reactions.  This let's you break up reactions into smaller files and then compose them into actual groups that you would add as reactions.  Reactions can depend on each other by composing your reactions and imported reactions using this mechanism.  For readability and modularity we recommend creating smaller reaction objects and composing them as needed.
+ ## Testing Reactions
+ 
+ Once you compose the business logic of your application as a set of reactions you need to be able to test it outside of your components.  What you want to test is that 
+ * Actions will be bound to props and can be executed
+ * The state is correctly updated
+ * The selectors mapped to the state are correct and bound to props
+ Props are, of course, a component concept so Reactions provides a way to retrieve the props exactly the way your componet would get them.
+ ```
+const props = Reactions.connectProps(store, 'list3');
+ ```
+ Now you can dispatch your actions
+ ```
+props.AddItem('foo');
+props.AddItemWithThunk('bar');
+
+ ```
+ Since Reactions is managing a particular slice of the state for you defined by the group (list3 in this case) you can easily get this slice to make assertions:
+ ```
+expect(Reactions.getState(store, 'list3').domain.todoList[0].text).toEqual('foo');
+expect(Reactions.getState(store, 'list3').domain.todoList[1].text).toEqual('bar');
+ ```
+ You can also easily test your selectors by updating your props after you call your actions so you can see the effect of your actions on your selectors. 
+ ```
+const propsAfter = Reactions.connectProps(store, 'list3');
+expect(propsAfter.todoList[0].text).toEqual('foo');
+expect(propsAfter.todoList[1].text).toEqual('bar');
+```
+## Groups are Optional
+Through out these examples we have used state maps and groups 'mount' our reactions into the state tree.  This is the reality of complex applications.  However if your state shape is simple and does not require mounting you can still use Reactions.connect and Reactions.connectProps by not specifying either of these parameters:
+
+```
+Reactions.addReactions(myReactions);
+
+const myConnectedComponent = Reactions.connect()(Component);
+
+const myOtherConnectedComponent = Reactions.connect(undefined,
+      (state, props) => ({todoList: state.domain.todoList});
+
+const props = Reactions.connectProps(store);
+```

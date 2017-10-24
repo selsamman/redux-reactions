@@ -1,5 +1,5 @@
 var connect = require('react-redux').connect;
-var ReactionsTemplate = {
+var Reactions = {
     actions: {},
     actionsGroup: {},
     selectorsGroup: {},
@@ -8,24 +8,42 @@ var ReactionsTemplate = {
     reducerTree: {},
     addReactions: addReactions,
     reduce: topLevelReducer,
+    connectProps: reactionConnectProps,
+    getState: reactionGetState,
     connect: reactionsConnect,
     bindActionCreators : bindActionCreatorsDeferred,
     stateChanges: stateChanges,
     clear: clear
 }
-var Reactions = Object.assign({}, ReactionsTemplate);
+
 export default Reactions;
 
 function clear () {
-    return Object.assign(Reactions, ReactionsTemplate);
+    Reactions.actions = {};
+    Reactions.actionsGroup = {};
+    Reactions.selectorsGroup = {};
+    Reactions.actionsStateMap = {};
+    Reactions.groupStateMap = {};
+    Reactions.reducerTree = {};
 }
-function reactionsConnect(group, mapStateToProps, mapDispatchToProps, mergeProps, options) {
+function reactionConnectProps(store, group, mapStateToProps, mapDispatchToProps) {
+    return reactionsConnect(group, mapStateToProps, mapDispatchToProps, undefined, undefined, store,
+        (mapStateSliceToProps, mapDispatchBoundToProps, mergePropsAndBindActionCreators) =>
+            mergePropsAndBindActionCreators(mapStateSliceToProps(store.getState(), {}),
+                mapDispatchBoundToProps(store.dispatch, {}), {})
+    )
+};
+function reactionGetState(store, group) {
+    return mapStateMap(store.getState(), Reactions.groupStateMap[group]);
+}
+function reactionsConnect(group, mapStateToProps, mapDispatchToProps, mergeProps, options, store, connectOverride) {
 
     function mapStateSliceToProps (state, props) {
-        var mappedState = mapStateMap(state, Reactions.groupStateMap[group]);
+        const groupOrDefault = group || '__default__';
+        var mappedState = mapStateMap(state, Reactions.groupStateMap[groupOrDefault]);
         var stateSlice = {};
-        for (var prop in Reactions.selectorsGroup[group])
-            stateSlice[prop] = Reactions.selectorsGroup[group][prop](mappedState);
+        for (var prop in Reactions.selectorsGroup[groupOrDefault])
+            stateSlice[prop] = Reactions.selectorsGroup[groupOrDefault][prop](mappedState);
 
         if (mapStateToProps)
             Object.assign(stateSlice, mapStateToProps(mappedState, props));
@@ -34,15 +52,17 @@ function reactionsConnect(group, mapStateToProps, mapDispatchToProps, mergeProps
     };
 
     function mapDispatchBoundToProps (dispatch, ownProps) {
-        var boundActions = bindActionCreatorsDeferred(Reactions.actionsGroup[group], dispatch);
+        var boundActions = bindActionCreatorsDeferred(group ? Reactions.actionsGroup[group] : Reactions.actions, dispatch);
         if (mapDispatchToProps)
             Object.assign(boundActions, typeof mapDispatchToProps == 'function' ?
-                mapDispatchToProps(ownProps, Reactions.actionsGroup[group]) :
+                mapDispatchToProps(ownProps, group ? Reactions.actionsGroup[group] : Reactions.actions) :
                 bindActionCreatorsDeferred(mapDispatchToProps));
         return boundActions;
     }
 
-    return connect(mapStateSliceToProps, mapDispatchBoundToProps, mergeProps || mergePropsAndBindActionCreators, options);
+    return connectOverride
+        ? connectOverride(mapStateSliceToProps, mapDispatchBoundToProps, mergePropsAndBindActionCreators)
+        : connect(mapStateSliceToProps, mapDispatchBoundToProps, mergeProps || mergePropsAndBindActionCreators, options);
 
     function mergePropsAndBindActionCreators(stateProps, dispatchProps, ownProps) {
         var props = {}
@@ -100,7 +120,7 @@ function topLevelReducer(rootState, action) {
 
     var reactions = Reactions.reducerTree[action.type];
     if (!reactions)
-        return rootState;
+        return rootState || {};
 
     // Process each high level state property
     var accumulator = {reactions: reactions.children, oldState: rootState, newState: {}};
@@ -231,11 +251,11 @@ function mapStateMap(rootState, stateMap) {
 }
 function prepareSelector(selector, selectorName, substitutions, group) {
 
-    if (group) {
-        Reactions.selectorsGroup[group] =  Reactions.selectorsGroup[group] || {};
-        Reactions.selectorsGroup[group][selectorName] = selector;
-        Reactions.groupStateMap[group] = substitutions;
-    }
+    if (!group)
+        group = '__default__';
+    Reactions.selectorsGroup[group] =  Reactions.selectorsGroup[group] || {};
+    Reactions.selectorsGroup[group][selectorName] = selector;
+    Reactions.groupStateMap[group] = substitutions;
 }
 /**
  * Produce a slice tree that encapsulates actions like ...
@@ -279,11 +299,11 @@ function prepareReaction(reaction, reactionName, substitutions, group) {
     if (group) {
         Reactions.actionsGroup[group] =  Reactions.actionsGroup[group] || {};
         Reactions.actionsGroup[group][originalreactionName] = actionFunction;
+        Reactions.groupStateMap[group] = substitutions;
     }
 
     Reactions.actions[reactionName] = actionFunction;
     Reactions.actionsStateMap[reactionName] = substitutions;
-    Reactions.groupStateMap[group] = substitutions;
 
     if (!reaction.state)
         return;

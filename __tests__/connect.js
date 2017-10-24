@@ -4,9 +4,8 @@ import { Provider } from 'react-redux'
 import { createStore, applyMiddleware} from 'redux';
 import thunk from 'redux-thunk';
 import { shallow, mount, render } from 'enzyme';
-// Demonstrate how we can have multiple todo lists without affecting todoList action
-// In this example you have multiple lists only one of which is active at any time.
-// Actions/reducers apply to the currently active list and connected to a component
+
+// Test the React connect function
 
 import {todoList} from './app.js';
 var initialState = {
@@ -22,12 +21,15 @@ var initialState = {
         list3: {
             todoList: [],
             nextId: 0
-        }
+        },
+        todoList: [],
+        nextId: 0
     },
     app: {
         list1: {filter: 'SHOW_ALL'},
         list2: {filter: 'SHOW_ALL'},
-        list3: {filter: 'SHOW_ALL'}
+        list3: {filter: 'SHOW_ALL'},
+        filter: 'SHOW_ALL'
     }
 };
 
@@ -71,7 +73,7 @@ describe('Two todoLists', () => {
                 return state.domain.todoList}
         };
         Reactions.addReactions([todoList, domainSelector], stateMap3, 'list3');
-
+        Reactions.addReactions([todoList, domainSelector]);
     });
     it ('can reduce lists', () => {
 
@@ -106,6 +108,13 @@ describe('Two todoLists', () => {
         wrapper3.find('a').simulate('click');
         wrapper3.find('a').simulate('click');
         expect(wrapper3.find('span').html()).toEqual('<span>3</span>');
+
+        // Use default action mapper without a group
+        var TestList4 = Reactions.connect()(Test);
+        const wrapper4 = mount(<Provider store={store}><TestList4 /></Provider>);
+        wrapper4.find('a').simulate('click');
+        expect(wrapper4.find('span').html()).toEqual('<span>1</span>');
+
     });
 
 })
