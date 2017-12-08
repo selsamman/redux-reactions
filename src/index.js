@@ -225,8 +225,7 @@ function mapStateMap(rootState, stateMap) {
     if (stateMap) {
         var newState = Object.assign({}, rootState);
         for (var stateProp in stateMap)
-            if (newState[stateProp])
-                newState[stateProp] = evaluateState(stateMap[stateProp])
+            newState[stateProp] = evaluateState(stateMap[stateProp])
         return newState;
     } else
         return rootState;

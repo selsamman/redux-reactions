@@ -114,6 +114,7 @@ describe('Two todoLists', () => {
         const wrapper4 = mount(<Provider store={store}><TestList4 /></Provider>);
         wrapper4.find('a').simulate('click');
         expect(wrapper4.find('span').html()).toEqual('<span>1</span>');
+        expect(store.getState().domain.todoList.length).toEqual(1);
 
     });
 
